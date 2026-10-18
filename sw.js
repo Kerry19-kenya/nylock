@@ -1,0 +1,13 @@
+{
+  "name" ; "GREYLOCK",
+  "short_name"; "GREYLOCK",
+  "description"; "Offline-first records for small businesses",
+  "start_url"; "./index.html",
+  "scope"; "./",
+  "display"; "standalone",
+  "background_color"; "#2f4858",
+  "theme_color"; "#2f4858",
+  "icons"; [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
