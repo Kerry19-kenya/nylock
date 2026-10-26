@@ -52,6 +52,7 @@ input,select,textarea{width:100%;margin-top:4px;padding:12px;border-radius:10px;
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,setDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const app=initializeApp({
   apiKey:"AIzaSyBgtYz0wi9k8OekE_4J0sZC04m8d5DgFNk",
   authDomain:"nylock-7be0d.firebaseapp.com",
@@ -59,12 +60,16 @@ const app=initializeApp({
   appId:"1:318242265704:web:0822a28f4a0cd0f89a79dd"
 });
 const auth=getAuth(app);
+let db;
+try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(e){db=getFirestore(app)}
 window.FB={
   login:(e,p)=>signInWithEmailAndPassword(auth,e,p),
   signup:(e,p)=>createUserWithEmailAndPassword(auth,e,p),
   reset:e=>sendPasswordResetEmail(auth,e),
   logout:()=>signOut(auth),
-  watch:cb=>onAuthStateChanged(auth,cb)
+  watch:cb=>onAuthStateChanged(auth,cb),
+  put:(uid,name,id,data)=>setDoc(doc(db,"users",uid,name,id),data),
+  sub:(uid,name,ok,bad)=>onSnapshot(collection(db,"users",uid,name),{includeMetadataChanges:true},ok,bad)
 };
 window.dispatchEvent(new Event('fb-ready'));
 </script>
@@ -78,12 +83,47 @@ addEventListener('appinstalled',()=>{deferred=null;render();toast('App installed
 let S=fresh(),tab='home',cart={},pay='cash',cust='',user=null,authReady=false,mode='login';
 const authErr=e=>({'auth/invalid-credential':'Wrong email or password','auth/email-already-in-use':'Email already registered','auth/weak-password':'Password needs 6+ characters','auth/invalid-email':'Invalid email','auth/network-request-failed':'No internet connection','auth/too-many-requests':'Too many tries, wait a bit'}[e&&e.code]||'Something went wrong');
 const dbp=new Promise(r=>{try{const q=indexedDB.open('greylock',1);q.onupgradeneeded=()=>q.result.createObjectStore('kv');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)}catch(e){r(null)}});
-async function load(){try{const d=await dbp;if(!d||!user)return;
- const get=k=>new Promise(r=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r()});
- let g=await get('state_'+user.uid);
- if(!g){const old=await get('state');if(old){g=old;S=old;await save();d.transaction('kv','readwrite').objectStore('kv').delete('state')}}
- if(g)S=g;navigator.storage?.persist?.()}catch(e){}}
-async function save(){try{const d=await dbp;if(!d||!user)return;d.transaction('kv','readwrite').objectStore('kv').put(JSON.parse(JSON.stringify(S)),'state_'+user.uid)}catch(e){}}
+// ===== Cloud sync (Firestore) =====
+let unsubs=[],shadow={},ready={},pend={},errAt=0;
+const COLS=['products','customers','ledger','meta'];
+const js=o=>JSON.stringify(o,Object.keys(o).sort());
+const isReady=()=>COLS.every(n=>ready[n]);
+const idbGet=async k=>{const d=await dbp;if(!d)return;return new Promise(r=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r()})};
+const idbPut=async(k,v)=>{const d=await dbp;if(d)d.transaction('kv','readwrite').objectStore('kv').put(v,k)};
+const idbDel=async k=>{const d=await dbp;if(d)d.transaction('kv','readwrite').objectStore('kv').delete(k)};
+function syncErr(e){console.error(e);if(Date.now()-errAt>8000){errAt=Date.now();toast(e&&e.code=='permission-denied'?'Cloud blocked: check Firestore rules':'Sync problem, will retry')}}
+function sync(){
+ if(!user||!window.FB||!FB.put)return;
+ const w=(name,o)=>{const j=js(o),k=name+'/'+o.id;if(shadow[k]===j)return;shadow[k]=j;FB.put(user.uid,name,o.id,JSON.parse(j)).catch(syncErr)};
+ const n=Date.now();
+ S.products.forEach((p,i)=>{if(p.t==null)p.t=n+i;w('products',p)});
+ S.customers.forEach((c,i)=>{if(c.t==null)c.t=n+i;w('customers',c)});
+ S.ledger.forEach(e=>w('ledger',e));
+ w('meta',{id:'settings',biz:S.settings.biz,cur:S.settings.cur});
+}
+function save(){sync()}
+async function migrate(){try{
+ if(await idbGet('cloud_'+user.uid))return;
+ const g=(await idbGet('state_'+user.uid))||(await idbGet('state'));
+ if(g&&g.ledger&&g.products){S=Object.assign(fresh(),g);await idbPut('state_'+user.uid,g);sync()}
+ await idbDel('state');await idbPut('cloud_'+user.uid,true)}catch(e){}}
+function stopSync(){unsubs.forEach(f=>{try{f()}catch(e){}});unsubs=[];shadow={};ready={};pend={}}
+function startSync(){
+ const me=user.uid;
+ COLS.forEach(name=>{
+  unsubs.push(FB.sub(me,name,snap=>{
+   if(!user||user.uid!==me)return;
+   pend[name]=snap.metadata.hasPendingWrites;
+   const rows=snap.docs.map(d=>d.data());
+   rows.forEach(o=>{shadow[name+'/'+o.id]=js(o)});
+   if(name=='ledger')S.ledger=rows.sort((a,b)=>a.ts-b.ts);
+   else if(name=='products')S.products=rows.sort((a,b)=>(a.t||0)-(b.t||0));
+   else if(name=='customers')S.customers=rows.sort((a,b)=>(a.t||0)-(b.t||0));
+   else{const st=rows.find(o=>o.id=='settings');if(st)S.settings={biz:st.biz||'My Shop',cur:st.cur||'KSh'}}
+   ready[name]=true;render()
+  },e=>{ready[name]=true;syncErr(e);render()}))
+ });
+}
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cents=v=>Math.round(parseFloat(v)*100)||0;
@@ -149,7 +189,9 @@ const A={
   S.ledger.forEach(e=>r.push([new Date(e.ts).toISOString(),e.type+(e.undo?' (reversal)':''),P(e.pid)?.name||'',C(e.cid)?.name||'',-e.dq,e.rev/100,e.exp/100,e.cash/100,e.debt/100,e.note||'']));
   sheet('Export CSV',[{k:'t',l:'Copy and paste into Excel or Sheets',t:'area',v:r.map(x=>x.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')}],()=>{$('#f_t').select();navigator.clipboard?.writeText($('#f_t').value);toast('Copied');return false},'Copy')},
  backup:()=>sheet('Backup',[{k:'t',l:'Copy this and keep it somewhere safe',t:'area',v:JSON.stringify(S)}],()=>{$('#f_t').select();navigator.clipboard?.writeText($('#f_t').value);toast('Copied');return false},'Copy'),
- restore:()=>sheet('Restore backup',[{k:'t',l:'Paste backup text',t:'area'}],v=>{try{const x=JSON.parse(v.t);if(!x.ledger||!x.products)throw 0;if(!confirm('This replaces all current data. Continue?'))return false;S=x;done('Restored')}catch(e){toast('Invalid backup');return false}},'Restore')
+ restore:()=>sheet('Restore backup',[{k:'t',l:'Paste backup text',t:'area'}],v=>{try{const x=JSON.parse(v.t);if(!x.ledger||!x.products)throw 0;if(!confirm('This ADDS the backup entries to your account. Your current data stays. Continue?'))return false;
+  const add=(mine,theirs)=>{const ids=new Set(mine.map(o=>o.id));(theirs||[]).forEach(o=>{if(!ids.has(o.id))mine.push(o)})};
+  add(S.products,x.products);add(S.customers,x.customers);add(S.ledger,x.ledger);S.ledger.sort((a,b)=>a.ts-b.ts);done('Backup added')}catch(e){toast('Invalid backup');return false}},'Restore')
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)A[b.dataset.a]?.(b.dataset)});
 document.addEventListener('change',e=>{if(e.target.id=='cust'){cust=e.target.value}});
@@ -208,15 +250,17 @@ function ledgerV(){
 
 function render(){
  if(!user){$('#app').innerHTML=authView();return}
+ if(!isReady()){$('#app').innerHTML='<div class="empty" style="padding-top:120px">Loading your data…</div>';return}
+ const st=!navigator.onLine?['off','● Offline · will sync later']:Object.values(pend).some(Boolean)?['off','● Syncing…']:['','● Synced to cloud'];
  const v={home,sell,stock:stockV,debts:debtsV,ledger:ledgerV}[tab]();
- $('#app').innerHTML=`<header><div><div class="logo" style="display:flex;align-items:center;gap:8px"><svg width="26" height="26" viewBox="0 0 512 512">${MARK}</svg>GREYLOCK</div><div class="biz" data-a="settings">${esc(S.settings.biz)} ⚙</div></div><span class="pill ${navigator.onLine?'':'off'}">${navigator.onLine?'● Saved on this device':'● Offline · saved on device'}</span></header>${v}<nav><div>${Object.keys(names).map(k=>`<button class="${tab==k?'on':''}" data-a="tab" data-v="${k}"><svg viewBox="0 0 24 24"><path d="${ic[k]}"/></svg>${names[k]}</button>`).join('')}</div></nav>`;
+ $('#app').innerHTML=`<header><div><div class="logo" style="display:flex;align-items:center;gap:8px"><svg width="26" height="26" viewBox="0 0 512 512">${MARK}</svg>GREYLOCK</div><div class="biz" data-a="settings">${esc(S.settings.biz)} ⚙</div></div><span class="pill ${st[0]}">${st[1]}</span></header>${v}<nav><div>${Object.keys(names).map(k=>`<button class="${tab==k?'on':''}" data-a="tab" data-v="${k}"><svg viewBox="0 0 24 24"><path d="${ic[k]}"/></svg>${names[k]}</button>`).join('')}</div></nav>`;
 }
 addEventListener('online',render);addEventListener('offline',render);
 
 function boot(){
  if(!window.FB||boot.done)return;
  boot.done=true;
- FB.watch(async u=>{user=u;authReady=true;S=fresh();cart={};tab='home';A.close();if(u)await load();render()})
+ FB.watch(async u=>{stopSync();user=u;authReady=true;S=fresh();cart={};tab='home';A.close();render();if(u){await migrate();startSync()}render()})
 }
 addEventListener('fb-ready',boot);
 if(window.FB)boot();
