@@ -1,13 +1,32 @@
+t · JSON
 {
-  "name": "GREYLOCK",
-  "short_name": "GREYLOCK",
-  "description": "Offline-first records for small businesses",
-  "start_url": "./index.html",
+  "name": "Greylock",
+  "short_name": "Greylock",
+  "description": "Simple sales, stock and debt tracking for your shop.",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#2f4858",
+  "orientation": "portrait",
+  "background_color": "#f3f5f7",
   "theme_color": "#2f4858",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
