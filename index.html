@@ -46,12 +46,40 @@ input,select,textarea{width:100%;margin-top:4px;padding:12px;border-radius:10px;
 .empty{text-align:center;padding:28px 10px;color:var(--mut)}
 </style></head><body>
 <div id="app"></div><div id="sheet"></div><div id="toast"></div>
+
+<!-- ============ FIREBASE (paste your own config values below) ============ -->
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+const app=initializeApp({
+  apiKey:"PASTE_YOUR_API_KEY",
+  authDomain:"PASTE_YOUR_PROJECT.firebaseapp.com",
+  projectId:"PASTE_YOUR_PROJECT_ID",
+  appId:"PASTE_YOUR_APP_ID"
+});
+const auth=getAuth(app);
+window.FB={
+  login:(e,p)=>signInWithEmailAndPassword(auth,e,p),
+  signup:(e,p)=>createUserWithEmailAndPassword(auth,e,p),
+  reset:e=>sendPasswordResetEmail(auth,e),
+  logout:()=>signOut(auth),
+  watch:cb=>onAuthStateChanged(auth,cb)
+};
+window.dispatchEvent(new Event('fb-ready'));
+</script>
+
 <script>
 const $=s=>document.querySelector(s);
-let S={products:[],customers:[],ledger:[],settings:{biz:'My Shop',cur:'KSh'}},tab='home',cart={},pay='cash',cust='';
+const fresh=()=>({products:[],customers:[],ledger:[],settings:{biz:'My Shop',cur:'KSh'}});
+let S=fresh(),tab='home',cart={},pay='cash',cust='',user=null,authReady=false,mode='login';
+const authErr=e=>({'auth/invalid-credential':'Wrong email or password','auth/email-already-in-use':'Email already registered','auth/weak-password':'Password needs 6+ characters','auth/invalid-email':'Invalid email','auth/network-request-failed':'No internet connection','auth/too-many-requests':'Too many tries, wait a bit'}[e&&e.code]||'Something went wrong');
 const dbp=new Promise(r=>{try{const q=indexedDB.open('greylock',1);q.onupgradeneeded=()=>q.result.createObjectStore('kv');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)}catch(e){r(null)}});
-async function load(){try{const d=await dbp;if(!d)return;const g=await new Promise(r=>{const q=d.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>r(q.result);q.onerror=()=>r()});if(g)S=g;navigator.storage?.persist?.()}catch(e){}}
-async function save(){try{const d=await dbp;d&&d.transaction('kv','readwrite').objectStore('kv').put(JSON.parse(JSON.stringify(S)),'state')}catch(e){}}
+async function load(){try{const d=await dbp;if(!d||!user)return;
+ const get=k=>new Promise(r=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r()});
+ let g=await get('state_'+user.uid);
+ if(!g){const old=await get('state');if(old){g=old;S=old;await save();d.transaction('kv','readwrite').objectStore('kv').delete('state')}}
+ if(g)S=g;navigator.storage?.persist?.()}catch(e){}}
+async function save(){try{const d=await dbp;if(!d||!user)return;d.transaction('kv','readwrite').objectStore('kv').put(JSON.parse(JSON.stringify(S)),'state_'+user.uid)}catch(e){}}
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cents=v=>Math.round(parseFloat(v)*100)||0;
@@ -77,6 +105,11 @@ function sheet(title,fields,ok,label='Save',note=''){
 }
 const A={
  tab:d=>{tab=d.v;render();scrollTo(0,0)},close:()=>$('#sheet').classList.remove('on'),
+ mode(){mode=mode=='login'?'signup':'login';render()},
+ async login(){try{await FB.login($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
+ async signup(){try{await FB.signup($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
+ async forgot(){const em=$('#em').value.trim();if(!em)return toast('Enter your email first');try{await FB.reset(em);toast('Reset link sent, check your email')}catch(e){toast(authErr(e))}},
+ logout(){if(confirm('Sign out?'))FB.logout()},
  add:d=>{cart[d.id]=(cart[d.id]||0)+1;render()},
  inc:d=>{cart[d.id]++;render()},dec:d=>{cart[d.id]--;if(cart[d.id]<=0)delete cart[d.id];render()},
  pay:d=>{pay=d.v;render()},
@@ -121,6 +154,17 @@ function amt(e){return e.type=='sale'?e.rev:e.type=='expense'?-e.exp:e.type=='ad
 const tm=t=>new Date(t).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const empty=(m,b)=>`<div class="empty">${m}${b?`<div style="margin-top:12px">${b}</div>`:''}</div>`;
 
+function authView(){
+ if(!authReady)return `<div class="empty" style="padding-top:120px">Loading…</div>`;
+ const L=mode=='login';
+ return `<div style="padding:60px 4px 0"><div class="logo">GREYLOCK</div>
+ <div class="card" style="margin-top:18px"><h3>${L?'Sign in':'Create account'}</h3>
+ ${window.FB?'':'<p class="mut" style="margin-top:6px">Can\'t reach the sign-in service. Check your internet connection and reload.</p>'}
+ <label>Email<input id="em" type="email" autocomplete="email"></label>
+ <label>Password<input id="pw" type="password" autocomplete="${L?'current-password':'new-password'}"></label>
+ <button class="btn full" style="margin-top:14px" data-a="${L?'login':'signup'}">${L?'Sign in':'Create account'}</button>
+ <div class="row"><button class="btn ghost sm" data-a="mode">${L?'New here? Sign up':'Have an account? Sign in'}</button>${L?'<button class="btn ghost sm" data-a="forgot">Forgot password?</button>':''}</div></div></div>`}
+
 function home(){
  const td=S.ledger.filter(e=>e.ts>=day0()),rev=sum(td,'rev'),exp=sum(td,'exp'),pr=rev-sum(td,'cogs')-exp;
  const days=[...Array(7)].map((_,i)=>{const s=day0(Date.now()-(6-i)*864e5);return{l:new Date(s).toLocaleDateString([],{weekday:'narrow'}),v:sum(S.ledger.filter(e=>e.ts>=s&&e.ts<s+864e5),'rev')}}),mx=Math.max(...days.map(d=>d.v),1);
@@ -154,15 +198,25 @@ function debtsV(){
 
 function ledgerV(){
  const rv=new Set(S.ledger.filter(e=>e.undo).map(e=>e.undo)),L=[...S.ledger].reverse().slice(0,150);
- return `<div class="row" style="margin:12px 0 0;flex-wrap:wrap"><button class="btn ghost sm" data-a="csv">Export CSV</button><button class="btn ghost sm" data-a="backup">Backup</button><button class="btn ghost sm" data-a="restore">Restore</button></div><h2>Every entry (never erased)</h2>
+ return `<div class="row" style="margin:12px 0 0;flex-wrap:wrap"><button class="btn ghost sm" data-a="csv">Export CSV</button><button class="btn ghost sm" data-a="backup">Backup</button><button class="btn ghost sm" data-a="restore">Restore</button><button class="btn ghost sm" data-a="logout">Sign out</button></div><h2>Every entry (never erased)</h2>
  ${L.length?`<div class="card">${L.map(e=>{const a=amt(e);return `<div class="li"><div><b>${e.undo?'↩ Reversal · ':''}${label(e)}${e.debt&&e.type=='sale'?'<span class="tag">credit</span>':''}</b><small>${esc(P(e.pid)?.name||C(e.cid)?.name||'')}${e.dq&&e.pid?' ×'+Math.abs(e.dq):''} · ${tm(e.ts)}${e.note&&!e.undo?' · '+esc(e.note):''}</small></div><div style="text-align:right"><b class="${a>0?'pos':a<0?'neg':''}">${a?money(a):''}</b>${!e.undo&&!rv.has(e.id)?`<div><button class="btn sm ghost" data-a="undo" data-id="${e.id}">Undo</button></div>`:rv.has(e.id)?'<small>reversed</small>':''}</div></div>`}).join('')}</div>`:empty('Nothing recorded yet.')}`}
 
 function render(){
+ if(!user){$('#app').innerHTML=authView();return}
  const v={home,sell,stock:stockV,debts:debtsV,ledger:ledgerV}[tab]();
  $('#app').innerHTML=`<header><div><div class="logo" style="display:flex;align-items:center;gap:8px"><svg width="26" height="26" viewBox="0 0 512 512">${MARK}</svg>GREYLOCK</div><div class="biz" data-a="settings">${esc(S.settings.biz)} ⚙</div></div><span class="pill ${navigator.onLine?'':'off'}">${navigator.onLine?'● Saved on this device':'● Offline · saved on device'}</span></header>${v}<nav><div>${Object.keys(names).map(k=>`<button class="${tab==k?'on':''}" data-a="tab" data-v="${k}"><svg viewBox="0 0 24 24"><path d="${ic[k]}"/></svg>${names[k]}</button>`).join('')}</div></nav>`;
 }
 addEventListener('online',render);addEventListener('offline',render);
+
+function boot(){
+ if(!window.FB||boot.done)return;
+ boot.done=true;
+ FB.watch(async u=>{user=u;authReady=true;S=fresh();cart={};tab='home';A.close();if(u)await load();render()})
+}
+addEventListener('fb-ready',boot);
+if(window.FB)boot();
+// If Firebase can't load (e.g. offline and not cached), stop the endless "Loading…"
+setTimeout(()=>{if(!authReady){authReady=true;render()}},6000);
 render();
-load().then(render);
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script></body></html>
