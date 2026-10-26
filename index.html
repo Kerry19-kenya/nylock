@@ -1,7 +1,12 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>GREYLOCK</title>
+<title>Greylock - Sales, Stock and Debt Tracker for Shops</title>
+<meta name="description" content="Greylock is a free app for small shops. Record sales, track stock, manage customer credit and see your daily profit, even offline.">
+<meta property="og:title" content="Greylock - Sales, Stock and Debt Tracker for Shops">
+<meta property="og:description" content="Record sales, track stock and customer debts, and see your daily profit. Works offline. Install it free.">
+<meta property="og:image" content="https://nylock-three.vercel.app/icon-512.png">
+<meta property="og:type" content="website">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2f4858">
 <link rel="icon" href="icon.svg">
@@ -78,6 +83,7 @@ window.dispatchEvent(new Event('fb-ready'));
 const $=s=>document.querySelector(s);
 const fresh=()=>({products:[],customers:[],ledger:[],settings:{biz:'My Shop',cur:'KSh'}});
 let deferred=null;
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;render()});
 addEventListener('appinstalled',()=>{deferred=null;render();toast('App installed ✓')});
 let S=fresh(),tab='home',cart={},pay='cash',cust='',user=null,authReady=false,mode='login';
@@ -149,7 +155,9 @@ function sheet(title,fields,ok,label='Save',note=''){
 }
 const A={
  tab:d=>{tab=d.v;render();scrollTo(0,0)},close:()=>$('#sheet').classList.remove('on'),
- async install(){if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;render()},
+ howto(){const ua=navigator.userAgent,ios=/iphone|ipad|ipod/i.test(ua),and=/android/i.test(ua);
+  sheet('Install Greylock',[],()=>{},'Got it',ios?'In <b>Safari</b>, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.':and?'In <b>Chrome</b>, tap the <b>⋮</b> menu at the top right, then <b>Install app</b> (or <b>Add to Home screen</b>).':'In <b>Chrome</b> or <b>Edge</b>, click the install icon at the right end of the address bar, or open the menu and choose <b>Install Greylock</b>.')},
+ async install(){if(!deferred)return A.howto();deferred.prompt();await deferred.userChoice;deferred=null;render()},
  mode(){mode=mode=='login'?'signup':'login';render()},
  async login(){try{await FB.login($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
  async signup(){try{await FB.signup($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
@@ -210,13 +218,14 @@ function authView(){
  <label>Email<input id="em" type="email" autocomplete="email"></label>
  <label>Password<input id="pw" type="password" autocomplete="${L?'current-password':'new-password'}"></label>
  <button class="btn full" style="margin-top:14px" data-a="${L?'login':'signup'}">${L?'Sign in':'Create account'}</button>
- <div class="row"><button class="btn ghost sm" data-a="mode">${L?'New here? Sign up':'Have an account? Sign in'}</button>${L?'<button class="btn ghost sm" data-a="forgot">Forgot password?</button>':''}</div></div></div>`}
+ <div class="row"><button class="btn ghost sm" data-a="mode">${L?'New here? Sign up':'Have an account? Sign in'}</button>${L?'<button class="btn ghost sm" data-a="forgot">Forgot password?</button>':''}</div></div>
+ ${!standalone?'<button class="btn acc full" data-a="install">⬇ Install the app</button>':''}</div>`}
 
 function home(){
  const td=S.ledger.filter(e=>e.ts>=day0()),rev=sum(td,'rev'),exp=sum(td,'exp'),pr=rev-sum(td,'cogs')-exp;
  const days=[...Array(7)].map((_,i)=>{const s=day0(Date.now()-(6-i)*864e5);return{l:new Date(s).toLocaleDateString([],{weekday:'narrow'}),v:sum(S.ledger.filter(e=>e.ts>=s&&e.ts<s+864e5),'rev')}}),mx=Math.max(...days.map(d=>d.v),1);
  const low=S.products.filter(p=>stock(p.id)<=p.min);
- return `${deferred?'<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Install Greylock</b><small class="mut" style="display:block">Open it like a normal app, even offline</small></div><button class="btn sm" data-a="install">Install</button></div>':''}<div class="card hero"><small>Profit today</small><b>${money(pr)}</b></div>
+ return `${!standalone?'<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Install Greylock</b><small class="mut" style="display:block">Open it like a normal app, even offline</small></div><button class="btn sm" data-a="install">Install</button></div>':''}<div class="card hero"><small>Profit today</small><b>${money(pr)}</b></div>
  <div class="grid"><div class="stat"><small>Sales today</small><b>${money(rev)}</b></div><div class="stat"><small>Expenses today</small><b>${money(exp)}</b></div>
  <div class="stat"><small>Cash in hand</small><b>${money(sum(S.ledger,'cash'))}</b></div><div class="stat"><small>Owed to you</small><b class="${sum(S.ledger,'debt')>0?'neg':''}">${money(sum(S.ledger,'debt'))}</b></div></div>
  <div class="row" style="margin:0 0 12px"><button class="btn" data-a="tab" data-v="sell">+ New sale</button><button class="btn ghost" data-a="expense">+ Expense</button></div>
