@@ -5,6 +5,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2f4858">
 <link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--bg:#f3f5f7;--card:#fff;--ink:#16202a;--mut:#6b7885;--line:#e1e6eb;--brand:#2f4858;--acc:#e09f3e;--ok:#1f8a5b;--bad:#c4423b;--on:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10161c;--card:#1a232c;--ink:#e8edf2;--mut:#8b9aa8;--line:#2a3541;--brand:#5d8aa3;--acc:#e8ae55;--ok:#3fbf88;--bad:#ef6b63;--on:#10161c}}
@@ -52,10 +53,10 @@ input,select,textarea{width:100%;margin-top:4px;padding:12px;border-radius:10px;
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 const app=initializeApp({
-  apiKey:"PASTE_YOUR_API_KEY",
-  authDomain:"PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId:"PASTE_YOUR_PROJECT_ID",
-  appId:"PASTE_YOUR_APP_ID"
+  apiKey:"AIzaSyBgtYz0wi9k8OekE_4J0sZC04m8d5DgFNk",
+  authDomain:"nylock-7be0d.firebaseapp.com",
+  projectId:"nylock-7be0d",
+  appId:"1:318242265704:web:0822a28f4a0cd0f89a79dd"
 });
 const auth=getAuth(app);
 window.FB={
@@ -71,6 +72,9 @@ window.dispatchEvent(new Event('fb-ready'));
 <script>
 const $=s=>document.querySelector(s);
 const fresh=()=>({products:[],customers:[],ledger:[],settings:{biz:'My Shop',cur:'KSh'}});
+let deferred=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;render()});
+addEventListener('appinstalled',()=>{deferred=null;render();toast('App installed ✓')});
 let S=fresh(),tab='home',cart={},pay='cash',cust='',user=null,authReady=false,mode='login';
 const authErr=e=>({'auth/invalid-credential':'Wrong email or password','auth/email-already-in-use':'Email already registered','auth/weak-password':'Password needs 6+ characters','auth/invalid-email':'Invalid email','auth/network-request-failed':'No internet connection','auth/too-many-requests':'Too many tries, wait a bit'}[e&&e.code]||'Something went wrong');
 const dbp=new Promise(r=>{try{const q=indexedDB.open('greylock',1);q.onupgradeneeded=()=>q.result.createObjectStore('kv');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)}catch(e){r(null)}});
@@ -105,6 +109,7 @@ function sheet(title,fields,ok,label='Save',note=''){
 }
 const A={
  tab:d=>{tab=d.v;render();scrollTo(0,0)},close:()=>$('#sheet').classList.remove('on'),
+ async install(){if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;render()},
  mode(){mode=mode=='login'?'signup':'login';render()},
  async login(){try{await FB.login($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
  async signup(){try{await FB.signup($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
@@ -169,7 +174,7 @@ function home(){
  const td=S.ledger.filter(e=>e.ts>=day0()),rev=sum(td,'rev'),exp=sum(td,'exp'),pr=rev-sum(td,'cogs')-exp;
  const days=[...Array(7)].map((_,i)=>{const s=day0(Date.now()-(6-i)*864e5);return{l:new Date(s).toLocaleDateString([],{weekday:'narrow'}),v:sum(S.ledger.filter(e=>e.ts>=s&&e.ts<s+864e5),'rev')}}),mx=Math.max(...days.map(d=>d.v),1);
  const low=S.products.filter(p=>stock(p.id)<=p.min);
- return `<div class="card hero"><small>Profit today</small><b>${money(pr)}</b></div>
+ return `${deferred?'<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Install Greylock</b><small class="mut" style="display:block">Open it like a normal app, even offline</small></div><button class="btn sm" data-a="install">Install</button></div>':''}<div class="card hero"><small>Profit today</small><b>${money(pr)}</b></div>
  <div class="grid"><div class="stat"><small>Sales today</small><b>${money(rev)}</b></div><div class="stat"><small>Expenses today</small><b>${money(exp)}</b></div>
  <div class="stat"><small>Cash in hand</small><b>${money(sum(S.ledger,'cash'))}</b></div><div class="stat"><small>Owed to you</small><b class="${sum(S.ledger,'debt')>0?'neg':''}">${money(sum(S.ledger,'debt'))}</b></div></div>
  <div class="row" style="margin:0 0 12px"><button class="btn" data-a="tab" data-v="sell">+ New sale</button><button class="btn ghost" data-a="expense">+ Expense</button></div>
