@@ -1,4 +1,4 @@
-const V='greylock-v4';
+const V='greylock-v5';
 const CORE=['./','index.html','manifest.json','icon.svg','icon-192.png','icon-512.png'];
 const FBJS=['app','auth','firestore'].map(n=>'https://www.gstatic.com/firebasejs/10.12.2/firebase-'+n+'.js');
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(async c=>{await c.addAll(CORE);await Promise.allSettled(FBJS.map(u=>c.add(u)))}).then(()=>self.skipWaiting()))});
