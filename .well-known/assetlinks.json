@@ -1,1 +1,9 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.nylock_three.twa",
+        "sha256_cert_fingerprints": ["24:EA:B2:1C:F0:11:E7:5A:E6:98:52:A8:60:AF:6F:FC:9A:3D:D7:40:57:32:75:7A:89:33:3B:11:A7:F5:F8:76"]
+      }
+    }]
 
