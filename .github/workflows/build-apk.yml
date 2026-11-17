@@ -26,8 +26,20 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Install dependencies
-        run: npm install
+      - name: Prepare GREYLOCK application
+        run: |
+          npm init -y
+          npm install @capacitor/core@^6.2.0 @capacitor/android@^6.2.0
+          npm install --save-dev @capacitor/cli@^6.2.0
+          mkdir -p www
+          cp index.html www/index.html
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.nylock.greylock.offline",
+            "appName": "Greylock",
+            "webDir": "www"
+          }
+          EOF
 
       - name: Add Android platform
         run: npx cap add android
@@ -46,3 +58,4 @@ jobs:
         with:
           name: GREYLOCK-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
