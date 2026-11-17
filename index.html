@@ -159,6 +159,21 @@ const A={
   sheet('Install Greylock',[],()=>{},'Got it',ios?'In <b>Safari</b>, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.':and?'In <b>Chrome</b>, tap the <b>⋮</b> menu at the top right, then <b>Install app</b> (or <b>Add to Home screen</b>).':'In <b>Chrome</b> or <b>Edge</b>, click the install icon at the right end of the address bar, or open the menu and choose <b>Install Greylock</b>.')},
  async install(){if(!deferred)return A.howto();deferred.prompt();await deferred.userChoice;deferred=null;render()},
  mode(){mode=mode=='login'?'signup':'login';render()},
+  
+togglePw(){
+  const p=$('#pw');
+  if(!p)return;
+
+  const show=p.type==='password';
+  p.type=show?'text':'password';
+
+  const b=document.querySelector('[data-a="togglePw"]');
+  if(b){
+    b.textContent=show?'Hide':'Show';
+    b.setAttribute('aria-label',show?'Hide password':'Show password');
+  }
+},
+
  async login(){try{await FB.login($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
  async signup(){try{await FB.signup($('#em').value.trim(),$('#pw').value)}catch(e){toast(authErr(e))}},
  async forgot(){const em=$('#em').value.trim();if(!em)return toast('Enter your email first');try{await FB.reset(em);toast('Reset link sent, check your email')}catch(e){toast(authErr(e))}},
