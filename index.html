@@ -209,17 +209,53 @@ function amt(e){return e.type=='sale'?e.rev:e.type=='expense'?-e.exp:e.type=='ad
 const tm=t=>new Date(t).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const empty=(m,b)=>`<div class="empty">${m}${b?`<div style="margin-top:12px">${b}</div>`:''}</div>`;
 
+
 function authView(){
- if(!authReady)return `<div class="empty" style="padding-top:120px">Loading…</div>`;
- const L=mode=='login';
- return `<div style="padding:60px 4px 0"><div class="logo">GREYLOCK</div>
- <div class="card" style="margin-top:18px"><h3>${L?'Sign in':'Create account'}</h3>
- ${window.FB?'':'<p class="mut" style="margin-top:6px">Can\'t reach the sign-in service. Check your internet connection and reload.</p>'}
- <label>Email<input id="em" type="email" autocomplete="email"></label>
- <label>Password<input id="pw" type="password" autocomplete="${L?'current-password':'new-password'}"></label>
- <button class="btn full" style="margin-top:14px" data-a="${L?'login':'signup'}">${L?'Sign in':'Create account'}</button>
- <div class="row"><button class="btn ghost sm" data-a="mode">${L?'New here? Sign up':'Have an account? Sign in'}</button>${L?'<button class="btn ghost sm" data-a="forgot">Forgot password?</button>':''}</div></div>
- ${!standalone?'<button class="btn acc full" data-a="install">⬇ Install the app</button>':''}</div>`}
+  if(!authReady)return `<div class="empty" style="padding-top:120px">Loading…</div>`;
+
+  const L=mode=='login';
+
+  return `<div style="padding:60px 4px 0">
+    <div class="logo">GREYLOCK</div>
+
+    <div class="card" style="margin-top:18px">
+      <h3>${L?'Sign in':'Create account'}</h3>
+
+      ${window.FB?'':'<p class="mut" style="margin-top:6px">Can\'t reach the sign-in service. Check your internet connection and reload.</p>'}
+
+      <label>Email
+        <input id="em" type="email" autocomplete="email">
+      </label>
+
+      <label>Password</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="pw"
+          style="flex:1;min-width:0"
+          type="password"
+          autocomplete="${L?'current-password':'new-password'}">
+        <button type="button"
+          class="btn ghost sm"
+          data-a="togglePw"
+          aria-label="Show password">Show</button>
+      </div>
+
+      <button class="btn full" style="margin-top:14px"
+        data-a="${L?'login':'signup'}">
+        ${L?'Sign in':'Create account'}
+      </button>
+
+      <div class="row">
+        <button class="btn ghost sm" data-a="mode">
+          ${L?'New here? Sign up':'Have an account? Sign in'}
+        </button>
+        ${L?'<button class="btn ghost sm" data-a="forgot">Forgot password?</button>':''}
+      </div>
+    </div>
+
+    ${!standalone?'<button class="btn acc full" data-a="install">⬇ Install the app</button>':''}
+  </div>`;
+}
+
 
 function home(){
  const td=S.ledger.filter(e=>e.ts>=day0()),rev=sum(td,'rev'),exp=sum(td,'exp'),pr=rev-sum(td,'cogs')-exp;
