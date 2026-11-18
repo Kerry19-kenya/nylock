@@ -69,7 +69,7 @@ let db;
 try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(e){db=getFirestore(app)}
 window.FB={
   login:(e,p)=>signInWithEmailAndPassword(auth,e,p),
-  signup:(e,p)=>createUserWithEmailAndPassword(auth,e,p),
+  signup:async(e,p)=>{   const credential=await createUserWithEmailAndPassword(auth,e,p);   const user=credential.user;    await setDoc(doc(db,"userProfiles",user.uid),{     uid:user.uid,     email:user.email,     plan:"Basic",     status:"active",     createdAt:new Date().toISOString(),     lastActive:new Date().toISOString()   });    return credential; },
   reset:e=>sendPasswordResetEmail(auth,e),
   logout:()=>signOut(auth),
   watch:cb=>onAuthStateChanged(auth,cb),
