@@ -213,6 +213,27 @@ togglePw(){
   const a=cents(v.a);if(!a)return toast('Enter an amount'),false;post({type:'payment',cid:d.id,cash:a,debt:-a});done('Payment recorded')}),
  undo:d=>{const e=S.ledger.find(x=>x.id==d.id);if(!confirm('Undo this entry? A reversing entry will be added; the original stays in the record.'))return;
   post({type:e.type,undo:e.id,pid:e.pid,cid:e.cid,note:'Reversal',rev:-e.rev,exp:-e.exp,cash:-e.cash,debt:-e.debt,dq:-e.dq,cogs:-e.cogs});done('Entry reversed')},
+ 
+async refreshProfiles(){
+  if(!user || user.uid!==OWNER_UID){
+    return toast('Access denied');
+  }
+
+  ownerLoading=true;
+  ownerError='';
+  render();
+
+  try{
+    const result=await FB.profiles();
+    ownerProfiles=result.docs.map(d=>d.data());
+  }catch(e){
+    ownerError='Could not load accounts. Check your connection and permissions.';
+  }finally{
+    ownerLoading=false;
+    render();
+  }
+},
+
  settings:()=>sheet('Settings',[{k:'b',l:'Business name',v:S.settings.biz},{k:'c',l:'Currency symbol',v:S.settings.cur}],v=>{S.settings.biz=v.b||'My Shop';S.settings.cur=v.c||'KSh';done('Saved')}),
  csv(){const r=[['Date','Type','Item','Customer','Qty','Sales','Expense','Cash','Owed','Note']];
   S.ledger.forEach(e=>r.push([new Date(e.ts).toISOString(),e.type+(e.undo?' (reversal)':''),P(e.pid)?.name||'',C(e.cid)?.name||'',-e.dq,e.rev/100,e.exp/100,e.cash/100,e.debt/100,e.note||'']));
