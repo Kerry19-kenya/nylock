@@ -57,7 +57,7 @@ input,select,textarea{width:100%;margin-top:4px;padding:12px;border-radius:10px;
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
- import {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,setDoc,onSnapshot,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ import {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,setDoc,onSnapshot,getDocs,getDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const app=initializeApp({
   apiKey:"AIzaSyBgtYz0wi9k8OekE_4J0sZC04m8d5DgFNk",
   authDomain:"nylock-7be0d.firebaseapp.com",
@@ -74,7 +74,22 @@ window.FB={
   logout:()=>signOut(auth),
   watch:cb=>onAuthStateChanged(auth,cb),
   put:(uid,name,id,data)=>setDoc(doc(db,"users",uid,name,id),data),
-   sub:(uid,name,ok,bad)=>onSnapshot(collection(db,"users",uid,name),{includeMetadataChanges:true},ok,bad),  profiles:()=>getDocs(collection(db,"userProfiles"))
+   sub:(uid,name,ok,bad)=>onSnapshot(collection(db,"users",uid,name),{includeMetadataChanges:true},ok,bad),  profiles:()=>getDocs(collection(db,"userProfiles")),
+  ensureProfile:async user=>{
+    const ref=doc(db,"userProfiles",user.uid);
+    const existing=await getDoc(ref);
+    if(!existing.exists()){
+      const now=new Date().toISOString();
+      await setDoc(ref,{
+        uid:user.uid,
+        email:user.email||"",
+        plan:"Basic",
+        status:"active",
+        createdAt:now,
+        lastActive:now
+      });
+    }
+  }
 };
 window.dispatchEvent(new Event('fb-ready'));
 </script>
@@ -407,7 +422,7 @@ addEventListener('online',render);addEventListener('offline',render);
 function boot(){
  if(!window.FB||boot.done)return;
  boot.done=true;
- FB.watch(async u=>{stopSync();user=u;authReady=true;S=fresh();cart={};tab='home';A.close();render();if(u){await migrate();startSync()}render()})
+ FB.watch(async u=>{stopSync();user=u;authReady=true;S=fresh();cart={};tab='home';A.close();render();if(u){try{await FB.ensureProfile(u)}catch(e){console.error('Profile setup failed:',e)}await migrate();startSync()}render()})
 }
 addEventListener('fb-ready',boot);
 if(window.FB)boot();
