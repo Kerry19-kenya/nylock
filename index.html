@@ -74,7 +74,7 @@ window.FB={
   logout:()=>signOut(auth),
   watch:cb=>onAuthStateChanged(auth,cb),
   put:(uid,name,id,data)=>setDoc(doc(db,"users",uid,name,id),data),
-  sub:(uid,name,ok,bad)=>onSnapshot(collection(db,"users",uid,name),{includeMetadataChanges:true},ok,bad)
+   sub:(uid,name,ok,bad)=>onSnapshot(collection(db,"users",uid,name),{includeMetadataChanges:true},ok,bad),  profiles:()=>getDocs(collection(db,"userProfiles"))
 };
 window.dispatchEvent(new Event('fb-ready'));
 </script>
