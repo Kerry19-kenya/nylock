@@ -289,6 +289,66 @@ function home(){
  ${!S.products.length?`<div class="card">${empty('Welcome! Start by adding the products you sell.','<button class="btn" data-a="newProduct">Add first product</button>')}</div>`:''}
  <h2>Last 7 days · sales</h2><div class="card"><div class="bars">${days.map(d=>`<div><i style="height:${d.v/mx*70}%"></i>${d.l}</div>`).join('')}</div></div>
  ${low.length?`<h2>Low stock</h2><div class="card">${low.map(p=>`<div class="li"><div><b>${esc(p.name)}</b><small>${stock(p.id)} left</small></div><button class="btn sm" data-a="restock" data-id="${p.id}">Restock</button></div>`).join('')}</div>`:''}`}
+ 
+
+function ownerDashboard(){
+  if(!user || user.uid!==OWNER_UID){
+    return '<div class="card">Access denied.</div>';
+  }
+
+  const profiles=ownerProfiles;
+  const basic=profiles.filter(p=>p.plan==='Basic').length;
+  const premium=profiles.filter(p=>p.plan==='Premium').length;
+  const active=profiles.filter(p=>p.status==='active').length;
+
+  return `
+    <h2>GREYLOCK Owner Dashboard</h2>
+
+    <div class="grid">
+      <div class="stat">
+        <small>Total accounts</small>
+        <b>${profiles.length}</b>
+      </div>
+      <div class="stat">
+        <small>Active accounts</small>
+        <b>${active}</b>
+      </div>
+      <div class="stat">
+        <small>Basic</small>
+        <b>${basic}</b>
+      </div>
+      <div class="stat">
+        <small>Premium</small>
+        <b>${premium}</b>
+      </div>
+    </div>
+
+    <div class="row">
+      <h2>Registered accounts</h2>
+      <button class="btn sm" data-a="refreshProfiles">Refresh</button>
+    </div>
+
+    ${ownerLoading?'<div class="card">Loading accounts…</div>':''}
+    ${ownerError?`<div class="card">${esc(ownerError)}</div>`:''}
+
+    ${profiles.map(p=>`
+      <div class="card">
+        <b>${esc(p.email||'No email')}</b>
+        <small class="mut" style="display:block">
+          Plan: ${esc(p.plan||'Basic')} · Status: ${esc(p.status||'Unknown')}
+        </small>
+        <small class="mut">
+          Registered: ${esc(p.createdAt||'Unknown')}
+        </small>
+        <small class="mut" style="display:block">
+          Last active: ${esc(p.lastActive||'Unknown')}
+        </small>
+      </div>
+    `).join('')}
+
+    ${!profiles.length&&!ownerLoading?'<div class="card">No registered profiles found yet.</div>':''}
+  `;
+}
 
 function sell(){
  if(!S.products.length)return empty('No products yet.','<button class="btn" data-a="newProduct">Add a product</button>');
