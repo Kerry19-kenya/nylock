@@ -234,7 +234,7 @@ async refreshProfiles(){
   }
 },
 
-  async refreshProfiles(){   if(!user || user.uid!==OWNER_UID)return toast('Access denied');   ownerLoading=true;   ownerError='';   render();   try{     const result=await FB.profiles();     ownerProfiles=result.docs.map(d=>d.data());   }catch(e){     ownerError='Could not load accounts. Check your connection and permissions.';   }finally{     ownerLoading=false;     render();   } }, settings:()=>sheet('Settings',[{k:'b',l:'Business name',v:S.settings.biz},{k:'c',l:'Currency symbol',v:S.settings.cur}],v=>{S.settings.biz=v.b||'My Shop';S.settings.cur=v.c||'KSh';done('Saved')}),
+    settings:()=>sheet('Settings',[{k:'b',l:'Business name',v:S.settings.biz},{k:'c',l:'Currency symbol',v:S.settings.cur}],v=>{S.settings.biz=v.b||'My Shop';S.settings.cur=v.c||'KSh';done('Saved')}),
  csv(){const r=[['Date','Type','Item','Customer','Qty','Sales','Expense','Cash','Owed','Note']];
   S.ledger.forEach(e=>r.push([new Date(e.ts).toISOString(),e.type+(e.undo?' (reversal)':''),P(e.pid)?.name||'',C(e.cid)?.name||'',-e.dq,e.rev/100,e.exp/100,e.cash/100,e.debt/100,e.note||'']));
   sheet('Export CSV',[{k:'t',l:'Copy and paste into Excel or Sheets',t:'area',v:r.map(x=>x.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')}],()=>{$('#f_t').select();navigator.clipboard?.writeText($('#f_t').value);toast('Copied');return false},'Copy')},
